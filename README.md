@@ -1,7 +1,3 @@
-# Antonio-Morelli-UCEMA
-Repositorio de entregas de la materia Creacion de Agentes de IA
-
-
 # Bot de reservas de canchas — Club Harrods
 
 ## Qué construí
@@ -64,7 +60,7 @@ Probado contra el sitio real, no en simulación:
 - **Búsqueda de socios.** Los 4 socios habilitados resuelven a su ID interno.
 - **Reserva completa.** Creé una reserva real, la verifiqué en el sitio y la cancelé. Después hice una que quedó: miércoles 17:00 a 18:00 en la cancha 6.
 - **Rotación de compañeros.** Cuando un socio ya tiene reserva ese día, el bot lo detecta y pasa al siguiente. Probado: rechazó a Robaldo y entró con Borysowski.
-- **Agenda y disparo.** El pedido se guarda y una tarea de Windows lo ejecuta a las 8:00, despertando la PC si está suspendida.
+- **Agenda y disparo automático.** El pedido queda guardado y una tarea de Windows lo ejecuta sola. El 18/08 despertó la PC suspendida, esperó los dos minutos previos y corrió sin que yo tocara nada. La reserva de esa corrida falló por otro motivo (ver más abajo), pero la mecánica de agendar, despertar y ejecutar funcionó.
 
 Uso:
 
@@ -83,10 +79,12 @@ python reservar.py --fecha viernes --hora 19:00 --confirm   # reservar ahora
 - **El parser devolvía 0 canchas libres.** El atributo `title` de las celdas contiene `=>`, y la expresión regular que buscaba el tag `<td>` cortaba en ese `>`, perdiendo el resto del tag. Apareció porque se comparó el resultado contra el conteo real de links del HTML, en vez de dar por bueno que "no explotó".
 - **Reservó media hora en vez de una hora.** El sitio recorta la duración máxima según el hueco libre y acepta el pedido igual, sin avisar. Hubo que cancelar esa reserva y rehacerla fijando la hora de fin explícitamente.
 - **Diagnóstico falso.** El agente reportó dos mensajes de error del sitio que resultaron ser texto estático presente en todas las respuestas, incluidas las exitosas. Se detectó comparando el HTML de un caso exitoso contra el de un rechazo.
+- **La primera corrida automática real falló y perdió el turno (18/08).** La tarea arrancó bien, despertó la PC y esperó bien, pero intentó reservar entre las 07:59:42 y las 07:59:53 y se dio por vencida siete segundos antes de que abrieran las reservas. La causa: el bot decidía si el día ya estaba habilitado leyendo el campo `Reserva (Abierta)` de la grilla, que en realidad indica si la cancha acepta reservas en general y da verdadero hasta para días a 10 días vista. La validación original de esa señal había sido defectuosa: se compararon dos días que diferían en pasado contra futuro, no en habilitado contra no habilitado, y se sacó la conclusión equivocada con dos datos. Se corrigió sincronizando contra el reloj del servidor del club vía el header HTTP `Date` (que además resultó estar 1,4 segundos detrás del reloj de mi PC), tomando la cancha 45 segundos antes de la hora —abrir el formulario retiene el turno unos 120 segundos, que es lo que hacen los socios que esperan con la pantalla abierta— y enviando el guardado en el segundo exacto.
 
 **Lo que no está probado o no está hecho:**
 
-- **El disparo de las 8:00 nunca corrió contra una apertura real.** El mecanismo de espera está verificado con una apertura simulada, pero la prueba de verdad es mañana a la mañana. Es la pieza más importante y la única que no se puede validar antes de que ocurra.
+- **El arreglo del disparo todavía no ganó una cancha.** Está ensayado con una apertura simulada y quedó agendado un pedido para el 19/08 a las 8:00. Hasta que no corra contra una apertura real y compita con otros socios, no está probado.
+- **Quedó una duda sin resolver.** No sé si el mensaje que devolvió el sitio en los intentos fallidos ("Hay otro usuario reservando la linea actual") era el rechazo por estar fuera de horario o competencia real de otros socios con el formulario abierto. El arreglo cubre las dos posibilidades, pero la causa exacta sigue sin confirmarse.
 - **El reintento ante caída de red está escrito pero sin probar**, porque no hay forma de provocar una caída del servidor del club a voluntad.
 - **Avisar desde el celular.** Falta un bot de Telegram. No es un problema de IA sino de transporte: el pedido tiene que llegar físicamente a la PC que corre la tarea.
 - **Una optimización pendiente**: cachear los IDs de cancha para saltear la lectura de grilla en el momento pico y ahorrar unos 800 ms.
@@ -98,3 +96,5 @@ Entendí qué es y qué no es un agente. Claude no es un servicio que queda corr
 Aprendí dónde conviene meter la IA y dónde no. Acá rindió muchísimo para investigar un sitio sin documentación y descubrir sus trampas, pero el producto final no tiene IA adentro: es Python haciendo pedidos HTTP. En una carrera de segundos, un modelo razonando en el medio es más lento y menos predecible que un script. La inteligencia va en la construcción, no en la ejecución.
 
 Del método, dos cosas me sirvieron: pedirle que fuera paso a paso y que preguntara antes de codear, y cuestionarle lo que proponía. Cuando dudé de un cambio suyo, revisarlo destapó tres problemas que él no había visto.
+
+Y lo que más me marcó: el agente puede equivocarse con total seguridad y que no se note por días. Dio por probado el mecanismo que decidía cuándo disparar, y estaba mal desde el principio; recién se supo cuando falló solo, de madrugada, y perdió el turno. Que algo funcione en las pruebas no significa que esté bien.
